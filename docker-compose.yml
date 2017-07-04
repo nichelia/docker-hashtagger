@@ -1,0 +1,7 @@
+nltk:
+  image: nichelia/nltk
+  command: bash
+  volumes:
+    - .:/code
+  working_dir: /code
+  restart: always
