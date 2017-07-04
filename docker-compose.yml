@@ -1,5 +1,5 @@
 nltk:
-  image: nichelia/nltk
+  image: nichelia/hashtagger
   command: bash
   volumes:
     - .:/code

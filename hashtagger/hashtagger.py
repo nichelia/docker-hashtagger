@@ -2,8 +2,11 @@
 
 import sys, os
 import nltk
+import tika
+tika.initVM()
 
 from texttable import Texttable
+from tika import parser
 
 class FileInterpreter:
 
@@ -16,10 +19,15 @@ class FileInterpreter:
     self.parse()
 
   def parse(self):
+    print self.filename
     # TODO: TRY/CATCH
-    file = open(self.filename, 'r')
-    raw_content = file.read().decode('utf8')
-    file.close()
+    if self.filename.endswith('.txt'):
+      file = open(self.filename, 'r')
+      raw_content = file.read().decode('utf8')
+      file.close()
+    else:
+      file = parser.from_file(self.filename)
+      raw_content = file["content"]
 
     self.content = raw_content
 
