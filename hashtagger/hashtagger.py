@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, os
+import sys, os, urllib, time, logging
 import nltk
 import tika
 tika.initVM()
@@ -8,27 +8,55 @@ tika.initVM()
 from texttable import Texttable
 from tika import parser
 
-class FileInterpreter:
+script_name = 'hashtagger.py'
+logging.getLogger().setLevel(logging.INFO)
 
-  def __init__(self, filename):
-    self.filename = filename
-    self.content = None
-    self.frequent_words = None
+class FileInterpreter:
+  """
+    Responsible for reading a file,
+    using either python io or
+    Apache Tika.
+    Extracts frequent words and
+    the sentences they are found in.
+  """
+
+  def __init__(self, filename=''):
+
+    self.filename = filename # Hold filename
+    self.content = None # Hold extracted content of file
+    self.frequent_words = None # Hold most common occurring words
+    # Hold sentences of most common occurring words
     self.sentences_of_frequent_words = None
 
-    self.parse()
+    if not filename:
+      logging.warn('%s:FileInterpreter: Failed to create object,'\
+                   ' no filename given', script_name)
+    else:
+      # Ready to parse file
+      self.parse()
 
   def parse(self):
-    # TODO: TRY/CATCH
-    if self.filename.endswith('.txt'):
-      file = open(self.filename, 'r')
-      raw_content = file.read().decode('utf8')
-      file.close()
-    else:
-      file = parser.from_file(self.filename)
-      raw_content = file['content']
-
-    self.content = raw_content
+    """
+      File parser.
+      Using python io if text file (.txt),
+      Apache Tika otherwise.
+      Saves contents in variable.
+    """
+    try:
+      if self.filename.endswith('.txt'):
+        file = open( self.filename, 'r' )
+        raw_content = file.read().decode('utf8')
+        file.close()
+      else:
+        file = parser.from_file( self.filename )
+        # Only interested in the content
+        raw_content = file['content']
+      self.content = raw_content
+    except Exception as e:
+      logging.warn('%s:FileInterpreter: Failed to read/extract'\
+                   'contents from file %s', script_name, self.filename)
+      logging.error(e, exc_info=True)
+      pass
 
   def extract_frequent_words(self, number_of_words=0):
     if not self.content:
@@ -67,13 +95,24 @@ class FileInterpreter:
 
 
 class Hashtagger:
+  """
+    Responsible for extracting hashtags
+    from the FileInterpreter objects, merges
+    them and generates a table as output.
+  """
 
-  def __init__(self, file_interpreters, hashtags_per_doc=0):
+  def __init__(self, file_interpreters=[], hashtags_per_doc=0):
+
     self.file_interpreters = file_interpreters
     self.hashtags_per_doc = hashtags_per_doc
     self.data_structure = {}
 
-    self.extract_hashtags()
+    if not file_interpreters:
+      logging.warn('%s:Hashtagger: Failed to create object,'\
+                   ' no file interpreters given', script_name)
+    else:
+      # Ready to extract hashtags from FileInterpreter objects.
+      self.extract_hashtags()
 
   def extract_hashtags(self):
     for file_interpreter in self.file_interpreters:
@@ -88,7 +127,6 @@ class Hashtagger:
         word = ( file_interpreter.frequent_words[index][0] ).encode('utf-8')
         freq = file_interpreter.frequent_words[index][1]
         sentences = file_interpreter.sentences_of_frequent_words[index]
-        # sentences = '\n '.join([x.encode('utf-8') for x in sentencesList])
 
         if word in self.data_structure:
           # Add new file
@@ -110,17 +148,60 @@ class Hashtagger:
     print '\n' + viewer.draw() + '\n'
 
 
-def main(argv):
+def main(template_filepath=''):
+  """
+    Creates FileInterpreter objects for every document
+    found in the given directory (template_filepaht).
+    Also creates a Hashtagger object to analyse all the
+    documents and print out a table with findings.
+  """
 
   file_interpreters = []
 
-  template_filepath = argv[0]
-  template_filenames = [ (template_filepath + '/' + f) for f in os.listdir( template_filepath ) if not f.startswith('.') ]
+  if template_filepath:
+    # Ommit any system files starting with '.'
+    template_filenames = [ (template_filepath + '/' + f)
+                            for f in os.listdir( template_filepath )
+                              if not f.startswith('.') ]
 
-  for filename in template_filenames:
-    file_interpreters.append( FileInterpreter(filename) )
+    if not template_filenames:
+      logging.warn('%s: Directory contains no documents.', script_name)
+      return
 
-  hashtagger_obj = Hashtagger( file_interpreters, 10).print_findings()
+    # For every document listed,
+    # create a file interpreter object.
+    for filename in template_filenames:
+      file_interpreters.append( FileInterpreter(filename) )
+
+    # Create hashtagger object to handle documents and print results.
+    # Hashtagger configured to only extract 
+    # the 10 most common occurring words.
+    max_words = 10
+    hashtagger_obj = Hashtagger( file_interpreters, max_words)
+    hashtagger_obj.print_findings()
+  else:
+    logging.warn('%s: Not directory given.', script_name)
+
 
 if __name__ == '__main__':
-  main(sys.argv[1:])
+  start_timer = time.time()
+
+  if ( len(sys.argv) != 2 ):
+    raise Exception( '\nUsage: python {0:} <template_filepath>'\
+                     '\n\twith: <template_filepath> the directory'\
+                     'of the documents to apply hashtags to.\n'
+                     .format(script_name) )
+
+  main(sys.argv[1])
+
+  end_timer=time.time()
+  elapsed_time=end_timer-start_timer
+  logging.info('%s: Executed in %f seconds.',
+               script_name, elapsed_time)
+
+
+
+
+
+
+
