@@ -1,6 +1,6 @@
 
 +-------------------------+-------------------------+-------------------------+
-|            #            | In document (frequency) |   Snippet (document)    |
+|            #            | In document (frequency) |        Snippets         |
 +=========================+=========================+=========================+
 | people                  | hashtagger/templates/do | [u"In the face of a     |
 |                         | c1.txt (12)             | politics that's shut    |

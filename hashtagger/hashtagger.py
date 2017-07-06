@@ -3,6 +3,7 @@
 import sys, os, urllib, time, logging
 import nltk
 import tika
+
 tika.initVM()
 
 from texttable import Texttable
@@ -59,36 +60,69 @@ class FileInterpreter:
       pass
 
   def extract_frequent_words(self, number_of_words=0):
+    """
+      Extract words from content, collect and clean to
+      produce most frequent words array. Persist in
+      a set of the word along with its frequency.
+    """
     if not self.content:
+      logging.info('%s:FileInterpreter: Cannot compute frequency '\
+                   'of words, file %s content is empty.',
+                   script_name, self.filename)
       return
 
-    tokenized_words = nltk.tokenize.word_tokenize(self.content.lower())
+    # Parse content and separate words (tokenise words)
+    # To avoid duplicates, we transform them all to lower case.
+    tokenized_words = nltk.tokenize.word_tokenize( self.content.lower() )
+    # Since we are using English, we use stopwords
+    # defined in the english language.
     english_stopwords = nltk.corpus.stopwords.words('english')
 
-    # Clean words, include only the ones that are more than one character
-    # and have alphabetic characters
-    clean_tokenized_words = ( w.lower() for w in tokenized_words if w.isalpha() if len(w)>1 if w.lower() not in english_stopwords )
+    # Clean our word collection.
+    # Exclude stopwords, single-character words and
+    # non alphabetic.
+    clean_tokenized_words = ( w.lower()
+                                for w in tokenized_words 
+                                  if w.isalpha()
+                                    if len(w)>1
+                                      if w.lower() not in english_stopwords )
 
-    # Calculate frequency of words
-    frequency_words = nltk.FreqDist(w.lower() for w in clean_tokenized_words)
+    # Compute frequency of our clean word collection.
+    frequency_words = nltk.FreqDist( w.lower()
+                                      for w in clean_tokenized_words )
 
-    # If a number of words to return is given (n)
+    # If a number of words to return is given (n),
     if (number_of_words):
       # then return the (n) most common words
       self.frequent_words = frequency_words.most_common(number_of_words)
     else:
-      # otherwise return all words in ascending order with higher frequency
+      # otherwise return all words in ascending order of higher frequency.
       self.frequent_words = frequency_words.most_common()
 
   def extract_sentences_of_frequent_words(self):
+    """
+      Extract senteces from content, for each collected
+      frequent word, match senteces that include it and
+      persist in an array.
+    """
     if not self.frequent_words:
+      logging.info('%s:FileInterpreter: Cannot find sentences of '\
+                   'frequent words, file %s does not have frequent '\
+                   'words.', script_name, self.filename)
       return
 
     sentences_of_frequent_words = []
-    tokenized_sentences = nltk.tokenize.sent_tokenize(self.content)
+    # Parse content and separate sentences (tokenise sentences)
+    tokenized_sentences = nltk.tokenize.sent_tokenize( self.content )
 
+    # For every word we collected as frequent,
     for word in self.frequent_words:
-      word_matched_sentences = [sentence for sentence in tokenized_sentences if word[0] in nltk.tokenize.word_tokenize(sentence.lower())]
+      # Check if word is included in sentence
+      word_matched_sentences = [ sentence
+                                  for sentence in tokenized_sentences
+                                    if word[0] in nltk.tokenize
+                                        .word_tokenize( sentence.lower() ) ]
+
       sentences_of_frequent_words.append(word_matched_sentences)
 
     self.sentences_of_frequent_words = sentences_of_frequent_words
@@ -115,34 +149,71 @@ class Hashtagger:
       self.extract_hashtags()
 
   def extract_hashtags(self):
+    """
+      Creates a data structure, that includes
+      all the words across all the files along with
+      the files found in, their frequency and their sentences.
+    """
+
+    # For every file,
     for file_interpreter in self.file_interpreters:
+      # extract frequent words
       if self.hashtags_per_doc:
         file_interpreter.extract_frequent_words(self.hashtags_per_doc)
       else:
         file_interpreter.extract_frequent_words()
+
+      # and their sentences
       file_interpreter.extract_sentences_of_frequent_words()
 
-      for index in range(0, len(file_interpreter.frequent_words)):
+      if ( not file_interpreter.frequent_words or
+           not file_interpreter.sentences_of_frequent_words ):
+        logging.info('%s:Hashtagger: Cannot generate hashtags, '\
+                     'frequent words and/or their sentences are '\
+                     'missing. (file: %s)',
+                     script_name, file_interpreter.filename)
+        return
+
+      # For every frequent word,
+      for index in range( 0, len(file_interpreter.frequent_words) ):
+        # collect filename, word, frequency and sentences it's included.
         file = file_interpreter.filename
         word = ( file_interpreter.frequent_words[index][0] ).encode('utf-8')
         freq = file_interpreter.frequent_words[index][1]
         sentences = file_interpreter.sentences_of_frequent_words[index]
 
+        # Persist in a data structure dictionary.
         if word in self.data_structure:
-          # Add new file
-          self.data_structure[word][1] = self.data_structure[word][1] + '\n' + file +' (' + str(freq) + ')'
-          # Add new sentences
+          # Include new file found
+          self.data_structure[word][1] = ( self.data_structure[word][1] + 
+                                          '\n' + file + 
+                                          ' (' + str(freq) + ')' )
+          # Include new sentences found
           self.data_structure[word][2].append(sentences)
         else:
-          tmp = [word, file + ' (' + str(freq) + ')', sentences]
+          # Create a new array of format:
+          tmp = [ word, file + ' (' + str(freq) + ')', sentences ]
           self.data_structure[word] = tmp
 
   def print_findings(self):
-    data = [ ['#','In document (frequency)','Snippet (document)'] ]
+    """
+      Prepare data for a table and display it.
+    """
 
+    # Specify our table headers as the first array of data.
+    data = [ ['#','In document (frequency)','Snippets'] ]
+
+    if not self.data_structure:
+      logging.info('%s:Hashtagger: Cannot print table, '\
+                   'data are missing.', script_name)
+      return
+
+    # Append arrays to data array.
     for value in self.data_structure.values():
       data.append(value)
 
+    # Using texttable, draw a table with the
+    # data array.
     viewer = Texttable()
     viewer.add_rows(data)
     print '\n' + viewer.draw() + '\n'
