@@ -17,7 +17,15 @@ First, you need to install and configure Docker on your system following this [i
 
 Once Docker is successfully installed and configured on your system (you should be able to run ```$ docker run hello-world```), you are ready to download a copy of this docker image.
 
-### Downlaod local copy
+### Clone project
+
+Choose a directory for this project and clone the github repo:
+
+```bash
+$ git clone https://github.com/nichelia/docker-hashtagger.git
+```
+
+### Downlaod local copy of docker image
 
 Download the Docker image by using the following (replace **:version** with desired tag or empty for latest).
 
@@ -41,19 +49,20 @@ nltk:
 
 ### Run python script
 
-Run the image as an interactive-shell (provides an environment with all the packages required for you to run the python script).
+First, make sure you are in the same directory as the cloned git project. Then, run the docker image as an interactive-shell (provides an environment with all the packages required for you to run the python script).
 
-```bash
+```
+$ cd [path_to_cloned_project]
 $ docker-compose run --rm nltk
 ```
 
-You first need to run Apache Tika REST API service, it will be used in the Python script for any file types appart from text [.txt]. Once in bash mode, run the following:
+Before running the Python script, you need to run Apache Tika REST API service first in the background. It will be used in the Python script for any file types other than text files [.txt]. To do so, run the following:
 
 ```bash
 $ java -jar /tika-server-1.15.jar -h 0.0.0.0 &
 ```
 
-Now you are ready to run the python script. It takes as a first and only parameter the directory of the files to read from. If you type the following command, it will take the sample files inlcuded in the templates folder and output the results in a text file, out.txt.
+Now you are ready to run the python script. It takes as a first and only parameter the directory of the files to read from. The following command assumes you want to run it against some sample documents and output the results in a text file, out.txt.
 
 ```bash
 $ python hashtagger/hashtagger.py  hashtagger/templates > out.txt
